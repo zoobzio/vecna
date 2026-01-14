@@ -1,0 +1,165 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    # Security-critical linters
+    - gosec        # Comprehensive security analyzer
+    - errorlint    # Proper error handling patterns
+    - noctx        # HTTP requests without context
+    - bodyclose    # HTTP response body not closed
+    - sqlclosecheck # SQL rows/statements not closed
+
+    # Code quality with security implications
+    - govet        # Suspicious constructs
+    - ineffassign  # Detect ineffectual assignments
+    - staticcheck  # Advanced static analysis
+    - unused       # Unused code detection
+
+    # Error handling
+    - errcheck     # Unchecked errors
+    - errchkjson   # JSON marshaling errors
+    - wastedassign # Wasted assignments
+
+    # Best practices
+    - gocritic     # Opinionated linter
+    - revive       # Fast, configurable linter
+    - unconvert    # Unnecessary type conversions
+    - dupl         # Code duplication
+    - goconst      # Repeated strings as constants
+    - godot        # Comment sentences
+    - misspell     # Spelling mistakes
+    - nakedret     # Naked returns
+    - prealloc     # Slice capacity hints
+    - predeclared  # Shadowing predeclared identifiers
+    - copyloopvar  # Loop variable capture
+
+  settings:
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G104  # We'll use errcheck instead
+      config:
+        global:
+          audit: true
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment  # Performance optimization, not critical for correctness
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    gocritic:
+      enabled-checks:
+        - commentedOutCode
+        - deferInLoop
+        - emptyFallthrough
+        - emptyStringTest
+        - equalFold
+        - evalOrder
+        - exposedSyncMutex
+        - externalErrorReassign
+        - filepathJoin
+        - hexLiteral
+        - importShadow
+        - indexAlloc
+        - initClause
+        - nestingReduce
+        - nilValReturn
+        - octalLiteral
+        - preferFilepathJoin
+        - preferFprint
+        - preferStringWriter
+        - preferWriteByte
+        - rangeExprCopy
+        - rangeValCopy
+        - redundantSprint
+        - regexpPattern
+        - regexpSimplify
+        - sloppyReassign
+        - sortSlice
+        - sprintfQuotedString
+        - stringConcatSimplify
+        - stringXbytes
+        - syncMapLoadAndDelete
+        - truncateCmp
+        - typeAssertChain
+        - typeDefFirst
+        - typeUnparen
+        - unlabelStmt
+        - unnamedResult
+        - unnecessaryBlock
+        - unnecessaryDefer
+        - weakCond
+        - yodaStyleExpr
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: modifies-parameter
+        - name: modifies-value-receiver
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: string-of-int
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unnecessary-stmt
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: unused-receiver
+        - name: useless-break
+        - name: var-declaration
+        - name: var-naming
+
+    dupl:
+      threshold: 150
+
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+
+    misspell:
+      locale: US
+
+  exclusions:
+    rules:
+      # Test files can have longer functions and different struct ordering
+      - path: _test\.go
+        linters:
+          - funlen
+          - goconst
+          - dupl
+          - govet
+          - errcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
