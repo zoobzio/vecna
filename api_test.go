@@ -17,8 +17,12 @@ func TestOp_String(t *testing.T) {
 		{Lt, "lt"},
 		{Lte, "lte"},
 		{In, "in"},
+		{Nin, "nin"},
+		{Like, "like"},
+		{Contains, "contains"},
 		{And, "and"},
 		{Or, "or"},
+		{Not, "not"},
 		{Op(99), "unknown"},
 	}
 

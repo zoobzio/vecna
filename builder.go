@@ -139,6 +139,15 @@ func (*Builder[T]) Or(filters ...*Filter) *Filter {
 	}
 }
 
+// Not negates a filter.
+// Returns a Filter that matches when the child filter does not match.
+func (*Builder[T]) Not(filter *Filter) *Filter {
+	return &Filter{
+		op:       Not,
+		children: []*Filter{filter},
+	}
+}
+
 // FieldBuilder constructs conditions for a specific field.
 type FieldBuilder[T any] struct {
 	builder *Builder[T]
@@ -183,6 +192,23 @@ func (fb *FieldBuilder[T]) In(values ...any) *Filter {
 	return fb.makeFilter(In, values)
 }
 
+// Nin creates a set exclusion filter (field NOT IN values).
+func (fb *FieldBuilder[T]) Nin(values ...any) *Filter {
+	// Convert variadic args to a slice for consistent handling
+	return fb.makeFilter(Nin, values)
+}
+
+// Like creates a pattern matching filter (field LIKE pattern).
+// Pattern syntax is provider-dependent but typically supports % and _ wildcards.
+func (fb *FieldBuilder[T]) Like(pattern string) *Filter {
+	return fb.makeFilter(Like, pattern)
+}
+
+// Contains creates an array membership filter (array field contains value).
+func (fb *FieldBuilder[T]) Contains(value any) *Filter {
+	return fb.makeFilter(Contains, value)
+}
+
 // makeFilter creates a Filter with the given operator and value.
 func (fb *FieldBuilder[T]) makeFilter(op Op, value any) *Filter {
 	if fb.err != nil {
@@ -217,9 +243,21 @@ func (fb *FieldBuilder[T]) validateValue(op Op, value any) error {
 		return nil // Already has an error
 	}
 
-	// For In operator, validate the slice elements
-	if op == In {
+	// For In/Nin operators, validate the slice elements
+	if op == In || op == Nin {
 		return validateInValue(value)
+	}
+
+	// For Like operator, require string field
+	if op == Like && fb.spec.Kind != KindString {
+		return fmt.Errorf("%w: operator %s not valid for %s field %s",
+			ErrInvalidFilter, op, fb.spec.Kind, fb.field)
+	}
+
+	// For Contains operator, require slice field
+	if op == Contains && fb.spec.Kind != KindSlice {
+		return fmt.Errorf("%w: operator %s not valid for %s field %s",
+			ErrInvalidFilter, op, fb.spec.Kind, fb.field)
 	}
 
 	// For comparison operators on non-numeric fields

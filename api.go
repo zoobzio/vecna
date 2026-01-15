@@ -22,15 +22,19 @@ type Op uint8
 
 // Filter operators.
 const (
-	Eq  Op = iota // Equal
-	Ne            // Not equal
-	Gt            // Greater than
-	Gte           // Greater than or equal
-	Lt            // Less than
-	Lte           // Less than or equal
-	In            // In set
-	And           // Logical AND
-	Or            // Logical OR
+	Eq       Op = iota // Equal
+	Ne                 // Not equal
+	Gt                 // Greater than
+	Gte                // Greater than or equal
+	Lt                 // Less than
+	Lte                // Less than or equal
+	In                 // In set
+	Nin                // Not in set
+	Like               // Pattern match
+	Contains           // Array contains
+	And                // Logical AND
+	Or                 // Logical OR
+	Not                // Logical NOT
 )
 
 // String returns the string representation of the operator.
@@ -50,10 +54,18 @@ func (o Op) String() string {
 		return "lte"
 	case In:
 		return "in"
+	case Nin:
+		return "nin"
+	case Like:
+		return "like"
+	case Contains:
+		return "contains"
 	case And:
 		return "and"
 	case Or:
 		return "or"
+	case Not:
+		return "not"
 	default:
 		return "unknown"
 	}

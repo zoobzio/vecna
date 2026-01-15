@@ -356,8 +356,12 @@ func TestParseOp(t *testing.T) {
 		{"lt", Lt, false},
 		{"lte", Lte, false},
 		{"in", In, false},
+		{"nin", Nin, false},
+		{"like", Like, false},
+		{"contains", Contains, false},
 		{"and", And, false},
 		{"or", Or, false},
+		{"not", Not, false},
 		{"invalid", 0, true},
 		{"", 0, true},
 		{"EQ", 0, true}, // case-sensitive
@@ -381,5 +385,208 @@ func TestParseOp(t *testing.T) {
 				t.Errorf("parseOp() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuilder_FromSpec_Nin(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	spec := &FilterSpec{
+		Op:    "nin",
+		Field: "category",
+		Value: []any{"spam", "junk", "deleted"},
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Op() != Nin {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Nin)
+	}
+	if filter.Field() != "category" {
+		t.Errorf("Filter.Field() = %v, want category", filter.Field())
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+
+	values, ok := filter.Value().([]any)
+	if !ok {
+		t.Fatalf("Filter.Value() type = %T, want []any", filter.Value())
+	}
+	if len(values) != 3 {
+		t.Errorf("len(Filter.Value()) = %v, want 3", len(values))
+	}
+}
+
+func TestBuilder_FromSpec_Nin_TypedSlice(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// Typed slice (not []any) - exercises the else branch in fromNinSpec
+	spec := &FilterSpec{
+		Op:    "nin",
+		Field: "category",
+		Value: []string{"spam", "junk"},
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Op() != Nin {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Nin)
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestBuilder_FromSpec_Like(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	spec := &FilterSpec{
+		Op:    "like",
+		Field: "category",
+		Value: "%tech%",
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Op() != Like {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Like)
+	}
+	if filter.Field() != "category" {
+		t.Errorf("Filter.Field() = %v, want category", filter.Field())
+	}
+	if filter.Value() != "%tech%" {
+		t.Errorf("Filter.Value() = %v, want %%tech%%", filter.Value())
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestBuilder_FromSpec_Like_InvalidValue(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// Like requires string value
+	spec := &FilterSpec{
+		Op:    "like",
+		Field: "category",
+		Value: 123, // not a string
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Err() == nil {
+		t.Error("Filter.Err() should not be nil for non-string like value")
+	}
+	if !errors.Is(filter.Err(), ErrInvalidFilter) {
+		t.Errorf("Filter.Err() = %v, want %v", filter.Err(), ErrInvalidFilter)
+	}
+}
+
+func TestBuilder_FromSpec_Contains(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	spec := &FilterSpec{
+		Op:    "contains",
+		Field: "tags",
+		Value: "featured",
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Op() != Contains {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Contains)
+	}
+	if filter.Field() != "tags" {
+		t.Errorf("Filter.Field() = %v, want tags", filter.Field())
+	}
+	if filter.Value() != "featured" {
+		t.Errorf("Filter.Value() = %v, want featured", filter.Value())
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestBuilder_FromSpec_Not(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	spec := &FilterSpec{
+		Op: "not",
+		Children: []*FilterSpec{
+			{Op: "eq", Field: "category", Value: "spam"},
+		},
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Op() != Not {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Not)
+	}
+	if len(filter.Children()) != 1 {
+		t.Errorf("len(Filter.Children()) = %v, want 1", len(filter.Children()))
+	}
+	if filter.Children()[0].Op() != Eq {
+		t.Errorf("Child Filter.Op() = %v, want %v", filter.Children()[0].Op(), Eq)
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestBuilder_FromSpec_Not_MultipleChildren(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// Not requires exactly one child
+	spec := &FilterSpec{
+		Op: "not",
+		Children: []*FilterSpec{
+			{Op: "eq", Field: "category", Value: "spam"},
+			{Op: "eq", Field: "category", Value: "junk"},
+		},
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Err() == nil {
+		t.Error("Filter.Err() should not be nil for not with multiple children")
+	}
+	if !errors.Is(filter.Err(), ErrInvalidFilter) {
+		t.Errorf("Filter.Err() = %v, want %v", filter.Err(), ErrInvalidFilter)
+	}
+}
+
+func TestBuilder_FromSpec_Not_Nested(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// NOT (category == "spam" OR category == "junk")
+	spec := &FilterSpec{
+		Op: "not",
+		Children: []*FilterSpec{
+			{
+				Op: "or",
+				Children: []*FilterSpec{
+					{Op: "eq", Field: "category", Value: "spam"},
+					{Op: "eq", Field: "category", Value: "junk"},
+				},
+			},
+		},
+	}
+
+	filter := builder.FromSpec(spec)
+
+	if filter.Op() != Not {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Not)
+	}
+	if len(filter.Children()) != 1 {
+		t.Errorf("len(Filter.Children()) = %v, want 1", len(filter.Children()))
+	}
+
+	orChild := filter.Children()[0]
+	if orChild.Op() != Or {
+		t.Errorf("Child Filter.Op() = %v, want %v", orChild.Op(), Or)
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
 	}
 }

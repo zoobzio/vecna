@@ -25,7 +25,7 @@ func (b *Builder[T]) FromSpec(spec *FilterSpec) *Filter {
 	}
 
 	// Handle logical operators
-	if op == And || op == Or {
+	if op == And || op == Or || op == Not {
 		return b.fromLogicalSpec(op, spec.Children)
 	}
 
@@ -33,7 +33,7 @@ func (b *Builder[T]) FromSpec(spec *FilterSpec) *Filter {
 	return b.fromFieldSpec(op, spec.Field, spec.Value)
 }
 
-// fromLogicalSpec converts a logical operator spec (and/or) to a Filter.
+// fromLogicalSpec converts a logical operator spec (and/or/not) to a Filter.
 func (b *Builder[T]) fromLogicalSpec(op Op, children []*FilterSpec) *Filter {
 	if len(children) == 0 {
 		return &Filter{
@@ -42,15 +42,29 @@ func (b *Builder[T]) fromLogicalSpec(op Op, children []*FilterSpec) *Filter {
 		}
 	}
 
+	// Not requires exactly one child
+	if op == Not && len(children) != 1 {
+		return &Filter{
+			op:  op,
+			err: fmt.Errorf("%w: %s requires exactly one child", ErrInvalidFilter, op),
+		}
+	}
+
 	filters := make([]*Filter, len(children))
 	for i, child := range children {
 		filters[i] = b.FromSpec(child)
 	}
 
-	if op == And {
+	switch op {
+	case And:
 		return b.And(filters...)
+	case Or:
+		return b.Or(filters...)
+	case Not:
+		return b.Not(filters[0])
+	default:
+		return &Filter{op: op, err: fmt.Errorf("%w: unsupported logical operator %s", ErrInvalidFilter, op)}
 	}
-	return b.Or(filters...)
 }
 
 // fromFieldSpec converts a field operator spec to a Filter.
@@ -72,6 +86,16 @@ func (b *Builder[T]) fromFieldSpec(op Op, field string, value any) *Filter {
 		return fb.Lte(value)
 	case In:
 		return b.fromInSpec(fb, value)
+	case Nin:
+		return b.fromNinSpec(fb, value)
+	case Like:
+		str, ok := value.(string)
+		if !ok {
+			return &Filter{op: op, field: field, value: value, err: fmt.Errorf("%w: like requires string value", ErrInvalidFilter)}
+		}
+		return fb.Like(str)
+	case Contains:
+		return fb.Contains(value)
 	default:
 		return &Filter{
 			op:    op,
@@ -93,6 +117,17 @@ func (*Builder[T]) fromInSpec(fb *FieldBuilder[T], value any) *Filter {
 	return fb.In(slice...)
 }
 
+// fromNinSpec handles the Nin operator which expects a slice value.
+func (*Builder[T]) fromNinSpec(fb *FieldBuilder[T], value any) *Filter {
+	// Value should be a slice when deserialized from JSON
+	slice, ok := value.([]any)
+	if !ok {
+		// If it's already a typed slice, pass it through
+		return fb.Nin(value)
+	}
+	return fb.Nin(slice...)
+}
+
 // parseOp converts a string operator to an Op constant.
 func parseOp(s string) (Op, error) {
 	switch s {
@@ -110,10 +145,18 @@ func parseOp(s string) (Op, error) {
 		return Lte, nil
 	case "in":
 		return In, nil
+	case "nin":
+		return Nin, nil
+	case "like":
+		return Like, nil
+	case "contains":
+		return Contains, nil
 	case "and":
 		return And, nil
 	case "or":
 		return Or, nil
+	case "not":
+		return Not, nil
 	default:
 		return 0, fmt.Errorf("%w: unknown operator %q", ErrInvalidFilter, s)
 	}

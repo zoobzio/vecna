@@ -5,8 +5,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/zoobzio/vecna)](https://goreportcard.com/report/github.com/zoobzio/vecna)
 [![CodeQL](https://github.com/zoobzio/vecna/actions/workflows/codeql.yml/badge.svg)](https://github.com/zoobzio/vecna/actions/workflows/codeql.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/zoobzio/vecna.svg)](https://pkg.go.dev/github.com/zoobzio/vecna)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/github/go-mod-go-version/zoobzio/vecna)](https://github.com/zoobzio/vecna/blob/main/go.mod)
+[![License](https://img.shields.io/github/license/zoobzio/vecna)](LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/zoobzio/vecna)](go.mod)
 [![Release](https://img.shields.io/github/v/release/zoobzio/vecna)](https://github.com/zoobzio/vecna/releases)
 
 Schema-validated filter builder for vector databases. Build type-safe metadata filters with compile-time field validation.

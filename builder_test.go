@@ -313,3 +313,140 @@ func TestResolveFieldKind_UnknownKind(t *testing.T) {
 		})
 	}
 }
+
+func TestFieldBuilder_Nin(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	filter := builder.Where("category").Nin("spam", "junk", "deleted")
+
+	if filter.Op() != Nin {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Nin)
+	}
+	if filter.Field() != "category" {
+		t.Errorf("Filter.Field() = %v, want category", filter.Field())
+	}
+
+	values, ok := filter.Value().([]any)
+	if !ok {
+		t.Fatalf("Filter.Value() type = %T, want []any", filter.Value())
+	}
+	if len(values) != 3 {
+		t.Errorf("len(Filter.Value()) = %v, want 3", len(values))
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestFieldBuilder_Like(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	filter := builder.Where("category").Like("%tech%")
+
+	if filter.Op() != Like {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Like)
+	}
+	if filter.Field() != "category" {
+		t.Errorf("Filter.Field() = %v, want category", filter.Field())
+	}
+	if filter.Value() != "%tech%" {
+		t.Errorf("Filter.Value() = %v, want %%tech%%", filter.Value())
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestFieldBuilder_LikeOnNonString(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// Like operator should error on non-string fields
+	filter := builder.Where("score").Like("%value%")
+
+	if filter.Err() == nil {
+		t.Error("Like on float field should have error")
+	}
+	if !errors.Is(filter.Err(), ErrInvalidFilter) {
+		t.Errorf("Filter.Err() = %v, want %v", filter.Err(), ErrInvalidFilter)
+	}
+}
+
+func TestFieldBuilder_Contains(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	filter := builder.Where("tags").Contains("featured")
+
+	if filter.Op() != Contains {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Contains)
+	}
+	if filter.Field() != "tags" {
+		t.Errorf("Filter.Field() = %v, want tags", filter.Field())
+	}
+	if filter.Value() != "featured" {
+		t.Errorf("Filter.Value() = %v, want featured", filter.Value())
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestFieldBuilder_ContainsOnNonSlice(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// Contains operator should error on non-slice fields
+	filter := builder.Where("category").Contains("value")
+
+	if filter.Err() == nil {
+		t.Error("Contains on string field should have error")
+	}
+	if !errors.Is(filter.Err(), ErrInvalidFilter) {
+		t.Errorf("Filter.Err() = %v, want %v", filter.Err(), ErrInvalidFilter)
+	}
+}
+
+func TestBuilder_Not(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	inner := builder.Where("category").Eq("spam")
+	filter := builder.Not(inner)
+
+	if filter.Op() != Not {
+		t.Errorf("Not Filter.Op() = %v, want %v", filter.Op(), Not)
+	}
+	if len(filter.Children()) != 1 {
+		t.Errorf("len(Not Filter.Children()) = %v, want 1", len(filter.Children()))
+	}
+	if filter.Children()[0].Op() != Eq {
+		t.Errorf("Child Filter.Op() = %v, want %v", filter.Children()[0].Op(), Eq)
+	}
+	if filter.Err() != nil {
+		t.Errorf("Not Filter.Err() = %v, want nil", filter.Err())
+	}
+}
+
+func TestBuilder_NotNested(t *testing.T) {
+	builder, _ := New[testMetadata]()
+
+	// NOT (category == "spam" OR category == "junk")
+	filter := builder.Not(
+		builder.Or(
+			builder.Where("category").Eq("spam"),
+			builder.Where("category").Eq("junk"),
+		),
+	)
+
+	if filter.Op() != Not {
+		t.Errorf("Filter.Op() = %v, want %v", filter.Op(), Not)
+	}
+	if len(filter.Children()) != 1 {
+		t.Errorf("len(Filter.Children()) = %v, want 1", len(filter.Children()))
+	}
+
+	orChild := filter.Children()[0]
+	if orChild.Op() != Or {
+		t.Errorf("Child Filter.Op() = %v, want %v", orChild.Op(), Or)
+	}
+	if filter.Err() != nil {
+		t.Errorf("Filter.Err() = %v, want nil", filter.Err())
+	}
+}
